@@ -46,6 +46,7 @@ intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
+        changeNotes = """See the <a href="https://github.com/Purgator/gitops-studio/blob/main/CHANGELOG.md">changelog</a>."""
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = provider { null }
