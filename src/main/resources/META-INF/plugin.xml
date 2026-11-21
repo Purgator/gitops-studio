@@ -1,0 +1,146 @@
+<idea-plugin>
+    <id>io.github.purgator.gitops</id>
+    <name>GitOps Studio</name>
+    <vendor url="https://github.com/Purgator/gitops-studio">Purgator</vendor>
+
+    <description><![CDATA[
+    <p><b>Drive your cloud repositories without leaving the IDE.</b> GitOps Studio brings pull requests,
+    pipelines and work items of GitHub, Azure DevOps, GitLab, Bitbucket and Gitea / Forgejo into one tool window,
+    with the same workflow whatever the host.</p>
+    <ul>
+      <li><b>Create a pull request in seconds</b>: title and description pre-filled from your commits or the
+          repository template, branch pushed for you, reviewers, labels, linked work items, draft and auto-complete.</li>
+      <li><b>Review and complete</b>: reviewers and votes, checks and policies, conversation, changed files with the
+          IDE diff, approve, merge, abandon, reopen.</li>
+      <li><b>Pipelines</b>: recent runs, jobs, logs in an editor tab, run, rerun and cancel.</li>
+      <li><b>Work items and issues</b>: search, create, change state, comment, start a branch from an item.</li>
+      <li><b>Git helpers</b>: gitmoji picker in the commit message, stale branch clean-up, one-click sync.</li>
+      <li><b>Modular</b>: every host is a module with its own settings page and an on/off switch; modules that are
+          off are never loaded.</li>
+      <li><b>Guided setup</b>: detects the host of your project and signs in with a token, the vendor CLI or the
+          credentials git already uses.</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
+
+    <extensionPoints>
+        <extensionPoint name="module" beanClass="io.github.purgator.gitops.core.modules.ModuleBean" dynamic="true">
+            <with attribute="implementationClass" implements="io.github.purgator.gitops.core.modules.GitOpsModule"/>
+        </extensionPoint>
+    </extensionPoints>
+
+    <!-- Modules. Name, description and icon are read from here, so a disabled module costs nothing. -->
+    <extensions defaultExtensionNs="io.github.purgator.gitops">
+        <module id="git" kind="local" name="Git" icon="/icons/git.svg"
+                description="Local helpers: gitmoji picker in the commit message, clean-up of stale branches, one-click sync."
+                implementationClass="io.github.purgator.gitops.git.GitModule"/>
+        <module id="github" name="GitHub" icon="/icons/github.svg"
+                description="Pull requests, Actions and issues on GitHub and GitHub Enterprise Server."
+                implementationClass="io.github.purgator.gitops.providers.github.GitHubModule"/>
+        <module id="azure" name="Azure DevOps" icon="/icons/azure.svg"
+                description="Pull requests, pipelines and work items on Azure DevOps Services and Server."
+                implementationClass="io.github.purgator.gitops.providers.azure.AzureDevOpsModule"/>
+        <module id="gitlab" name="GitLab" icon="/icons/gitlab.svg"
+                description="Merge requests, pipelines and issues on GitLab.com and self-managed GitLab."
+                implementationClass="io.github.purgator.gitops.providers.gitlab.GitLabModule"/>
+        <module id="bitbucket" name="Bitbucket" icon="/icons/bitbucket.svg"
+                description="Pull requests, pipelines and issues on Bitbucket Cloud."
+                implementationClass="io.github.purgator.gitops.providers.bitbucket.BitbucketModule"/>
+        <module id="gitea" name="Gitea / Forgejo" icon="/icons/gitea.svg"
+                description="Pull requests, Actions and issues on Gitea, Forgejo and Codeberg."
+                implementationClass="io.github.purgator.gitops.providers.gitea.GiteaModule"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="GitOps Studio" anchor="bottom" icon="/icons/toolWindow.svg" canCloseContents="false"
+                    factoryClass="io.github.purgator.gitops.ui.toolwindow.GitOpsToolWindowFactory"/>
+
+        <notificationGroup id="GitOps Studio" displayType="BALLOON"/>
+
+        <statusBarWidgetFactory id="GitOpsStudio.PullRequest" order="after gitWidget"
+                                implementation="io.github.purgator.gitops.ui.statusbar.PullRequestWidgetFactory"/>
+
+        <postStartupActivity implementation="io.github.purgator.gitops.ui.setup.SetupNudge"/>
+
+        <applicationConfigurable parentId="tools" id="gitops.studio" displayName="GitOps Studio"
+                                 instance="io.github.purgator.gitops.ui.settings.GitOpsConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.git" displayName="Git"
+                                 instance="io.github.purgator.gitops.ui.settings.GitModuleConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.github" displayName="GitHub"
+                                 instance="io.github.purgator.gitops.ui.settings.GitHubConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.azure" displayName="Azure DevOps"
+                                 instance="io.github.purgator.gitops.ui.settings.AzureDevOpsConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.gitlab" displayName="GitLab"
+                                 instance="io.github.purgator.gitops.ui.settings.GitLabConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.bitbucket" displayName="Bitbucket"
+                                 instance="io.github.purgator.gitops.ui.settings.BitbucketConfigurable"/>
+        <applicationConfigurable parentId="gitops.studio" id="gitops.studio.gitea" displayName="Gitea / Forgejo"
+                                 instance="io.github.purgator.gitops.ui.settings.GiteaConfigurable"/>
+    </extensions>
+
+    <actions>
+        <action id="GitOpsStudio.CreatePullRequest" class="io.github.purgator.gitops.ui.actions.CreatePullRequestAction"
+                text="Create Pull Request…" description="Create a pull request for the current branch"
+                icon="/icons/prOpen.svg">
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt shift P"/>
+        </action>
+        <action id="GitOpsStudio.OpenBranchPullRequest" class="io.github.purgator.gitops.ui.actions.OpenBranchPullRequestAction"
+                text="Open Pull Request of Current Branch" description="Open the pull request of the current branch in the browser"/>
+        <action id="GitOpsStudio.ShowToolWindow" class="io.github.purgator.gitops.ui.actions.ShowToolWindowAction"
+                text="Show Tool Window" icon="/icons/toolWindow.svg"/>
+        <action id="GitOpsStudio.Refresh" class="io.github.purgator.gitops.ui.actions.RefreshAction"
+                text="Refresh" icon="AllIcons.Actions.Refresh"/>
+        <action id="GitOpsStudio.Clone" class="io.github.purgator.gitops.ui.actions.CloneFromCloudAction"
+                text="Clone from Cloud…" description="Browse the repositories of a connected account and clone one"/>
+        <action id="GitOpsStudio.Sync" class="io.github.purgator.gitops.git.SyncDefaultBranchAction"
+                text="Sync with Remote" description="Fetch every remote and fast-forward the default branch"/>
+        <action id="GitOpsStudio.CleanUpBranches" class="io.github.purgator.gitops.git.CleanUpBranchesAction"
+                text="Clean Up Branches…" description="Delete local branches that are merged or whose remote branch is gone"/>
+        <action id="GitOpsStudio.SetupWizard" class="io.github.purgator.gitops.ui.actions.SetupWizardAction"
+                text="Setup Wizard…" description="Enable modules and connect accounts step by step"/>
+        <action id="GitOpsStudio.Settings" class="io.github.purgator.gitops.ui.actions.OpenSettingsAction"
+                text="Settings…" icon="AllIcons.General.Settings"/>
+        <action id="GitOpsStudio.OpenFile" class="io.github.purgator.gitops.ui.actions.OpenFileInCloudAction"
+                text="Open on Hosting Service" icon="AllIcons.General.Web"/>
+        <action id="GitOpsStudio.CopyFileLink" class="io.github.purgator.gitops.ui.actions.CopyFileCloudLinkAction"
+                text="Copy Hosting Service Link" icon="AllIcons.Actions.Copy"/>
+        <action id="GitOpsStudio.Gitmoji" class="io.github.purgator.gitops.git.GitmojiAction"
+                text="Gitmoji" description="Start the commit message with a gitmoji" icon="/icons/gitmoji.svg">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+        </action>
+
+        <group id="GitOpsStudio.MainGroup" text="GitOps Studio" popup="true" icon="/icons/toolWindow.svg">
+            <reference ref="GitOpsStudio.CreatePullRequest"/>
+            <reference ref="GitOpsStudio.OpenBranchPullRequest"/>
+            <reference ref="GitOpsStudio.ShowToolWindow"/>
+            <reference ref="GitOpsStudio.Refresh"/>
+            <separator/>
+            <reference ref="GitOpsStudio.Clone"/>
+            <reference ref="GitOpsStudio.Sync"/>
+            <reference ref="GitOpsStudio.CleanUpBranches"/>
+            <separator/>
+            <reference ref="GitOpsStudio.SetupWizard"/>
+            <reference ref="GitOpsStudio.Settings"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+
+        <group id="GitOpsStudio.GitMenuGroup">
+            <separator/>
+            <reference ref="GitOpsStudio.CreatePullRequest"/>
+            <reference ref="GitOpsStudio.Sync"/>
+            <reference ref="GitOpsStudio.CleanUpBranches"/>
+            <add-to-group group-id="Git.MainMenu" anchor="last"/>
+        </group>
+
+        <group id="GitOpsStudio.FileGroup">
+            <reference ref="GitOpsStudio.OpenFile"/>
+            <reference ref="GitOpsStudio.CopyFileLink"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>
