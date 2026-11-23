@@ -56,8 +56,15 @@ class GitOpsSettings : PersistentStateComponent<GitOpsSettings.State> {
         // Git module
         var gitmojiEnabled: Boolean = true
         var gitmojiAsCode: Boolean = false
+        var gitmojiCompletion: Boolean = true
         var protectedBranches: String = "main, master, develop, release/*"
-        var pruneOnSync: Boolean = true
+        var pruneOnSync: Boolean = false
+        var inlineBlame: Boolean = true
+        var inlineBlameSubject: Boolean = true
+        var showAheadBehind: Boolean = true
+
+        /** 0 turns automatic fetch off. */
+        var autoFetchMinutes: Int = 0
 
         @XCollection(style = XCollection.Style.v2)
         var providers: MutableList<ProviderSettings> = mutableListOf()

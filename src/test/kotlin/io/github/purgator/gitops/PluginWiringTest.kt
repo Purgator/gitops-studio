@@ -1,8 +1,11 @@
 package io.github.purgator.gitops
 
+import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorLinePainter
+import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.util.xmlb.XmlSerializer
@@ -10,6 +13,9 @@ import io.github.purgator.gitops.core.accounts.Account
 import io.github.purgator.gitops.core.accounts.AccountStore
 import io.github.purgator.gitops.core.modules.ModuleRegistry
 import io.github.purgator.gitops.core.settings.GitOpsSettings
+import io.github.purgator.gitops.git.AheadBehindWidget
+import io.github.purgator.gitops.git.GitmojiCompletionContributor
+import io.github.purgator.gitops.git.InlineBlamePainter
 import io.github.purgator.gitops.ui.settings.AzureDevOpsConfigurable
 import io.github.purgator.gitops.ui.settings.BitbucketConfigurable
 import io.github.purgator.gitops.ui.settings.GitHubConfigurable
@@ -60,10 +66,14 @@ class PluginWiringTest {
         val actions = ActionManager.getInstance()
         val ids = listOf(
             "CreatePullRequest", "OpenBranchPullRequest", "ShowToolWindow", "Refresh", "Clone", "Sync", "CleanUpBranches",
-            "SetupWizard", "Settings", "OpenFile", "CopyFileLink", "Gitmoji", "MainGroup", "GitMenuGroup", "FileGroup",
+            "SetupWizard", "Settings", "OpenFile", "CopyFileLink", "Gitmoji", "ToggleInlineBlame", "ShowLineCommit",
+            "MainGroup", "GitMenuGroup", "FileGroup",
         )
         for (id in ids) assertNotNull(actions.getAction("GitOpsStudio.$id"), id)
         assertTrue(StatusBarWidgetFactory.EP_NAME.extensionList.any { it.id == PullRequestWidget.ID })
+        assertTrue(StatusBarWidgetFactory.EP_NAME.extensionList.any { it.id == AheadBehindWidget.ID })
+        assertTrue(EditorLinePainter.EP_NAME.extensionList.any { it is InlineBlamePainter })
+        assertTrue(CompletionContributor.forLanguage(PlainTextLanguage.INSTANCE).any { it is GitmojiCompletionContributor })
         assertNotNull(NotificationGroupManager.getInstance().getNotificationGroup("GitOps Studio"))
     }
 

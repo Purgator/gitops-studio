@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Git
+
+- **Inline blame**: the line under the caret shows who last changed it, when and in which commit. *Show Commit of Current Line* opens that commit in the Git log; **Git → Inline Blame** turns the annotation on or off.
+- The **status bar** shows the commits the current branch has to push and to pull (`↑2 ↓1`); click it to fetch.
+- **Automatic fetch** at an interval of your choice. Off by default.
+- **Gitmoji suggestions**: type `feature`, `fix`, `docs`, `refactor`… or the name of a gitmoji (`sparkles`) as the first word of a commit message and pick the gitmoji from the completion list. The picker also finds gitmojis by these words.
+- Picking a gitmoji now leaves the caret right after it, ready to type the message.
+- *Sync with Remote* no longer prunes remote branches unless you turn the option on.
+
 ## 0.1.0
 
 First release.

@@ -31,6 +31,8 @@ import io.github.purgator.gitops.core.modules.ModuleRegistry
 import io.github.purgator.gitops.core.provider.Capability
 import io.github.purgator.gitops.core.provider.HostingProvider
 import io.github.purgator.gitops.core.settings.GitOpsSettings
+import io.github.purgator.gitops.git.AutoFetchService
+import io.github.purgator.gitops.git.Blame
 import io.github.purgator.gitops.ui.setup.SetupWizard
 import java.awt.Dimension
 import javax.swing.JList
@@ -231,9 +233,20 @@ class GiteaConfigurable : ProviderConfigurable("gitea")
 class GitModuleConfigurable : ModuleConfigurable(ModuleRegistry.GIT) {
     override fun Panel.moduleSettings() {
         val state = GitOpsSettings.get().values
+        group("Editor") {
+            row {
+                checkBox("Show who last changed the current line, at the end of the line").bindSelected(state::inlineBlame)
+                    .comment("Ann Lee, 3 days ago • Fix the login")
+            }
+            row { checkBox("Include the commit subject").bindSelected(state::inlineBlameSubject) }
+        }
         group("Commit Messages") {
             row {
                 checkBox("Show the gitmoji picker in the commit message toolbar").bindSelected(state::gitmojiEnabled)
+            }
+            row {
+                checkBox("Suggest a gitmoji while typing the first word of the message").bindSelected(state::gitmojiCompletion)
+                    .comment("Type feature, fix, docs, refactor… or the name of a gitmoji, such as sparkles")
             }
             row {
                 checkBox("Insert the :code: instead of the emoji character").bindSelected(state::gitmojiAsCode)
@@ -245,7 +258,23 @@ class GitModuleConfigurable : ModuleConfigurable(ModuleRegistry.GIT) {
                 textField().bindText(state::protectedBranches).align(AlignX.FILL)
                     .comment("Comma separated, * allowed. Never offered for deletion by Clean Up Branches.")
             }
-            row { checkBox("Prune deleted remote branches when syncing").bindSelected(state::pruneOnSync) }
+            row {
+                checkBox("Show the commits to push and to pull in the status bar").bindSelected(state::showAheadBehind)
+                    .comment("Applies to newly opened projects")
+            }
         }
+        group("Remotes") {
+            row { checkBox("Prune deleted remote branches when syncing").bindSelected(state::pruneOnSync) }
+            row("Fetch automatically every") {
+                spinner(0..240, 1).bindIntValue(state::autoFetchMinutes)
+                label("minutes").comment("0 turns automatic fetch off")
+            }
+        }
+    }
+
+    override fun apply() {
+        super.apply()
+        AutoFetchService.rescheduleAll()
+        Blame.repaintEditors()
     }
 }

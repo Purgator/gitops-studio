@@ -14,7 +14,8 @@
           IDE diff, approve, merge, abandon, reopen.</li>
       <li><b>Pipelines</b>: recent runs, jobs, logs in an editor tab, run, rerun and cancel.</li>
       <li><b>Work items and issues</b>: search, create, change state, comment, start a branch from an item.</li>
-      <li><b>Git helpers</b>: gitmoji picker in the commit message, stale branch clean-up, one-click sync.</li>
+      <li><b>Git helpers</b>: inline blame on the current line, commits to push and pull in the status bar,
+          gitmoji suggestions while you type the commit message, stale branch clean-up, one-click sync, optional auto-fetch.</li>
       <li><b>Modular</b>: every host is a module with its own settings page and an on/off switch; modules that are
           off are never loaded.</li>
       <li><b>Guided setup</b>: detects the host of your project and signs in with a token, the vendor CLI or the
@@ -35,7 +36,7 @@
     <!-- Modules. Name, description and icon are read from here, so a disabled module costs nothing. -->
     <extensions defaultExtensionNs="io.github.purgator.gitops">
         <module id="git" kind="local" name="Git" icon="/icons/git.svg"
-                description="Local helpers: gitmoji picker in the commit message, clean-up of stale branches, one-click sync."
+                description="Local helpers: inline blame, commits to push and pull in the status bar, gitmoji in the commit message, clean-up of stale branches, one-click sync, auto-fetch."
                 implementationClass="io.github.purgator.gitops.git.GitModule"/>
         <module id="github" name="GitHub" icon="/icons/github.svg"
                 description="Pull requests, Actions and issues on GitHub and GitHub Enterprise Server."
@@ -63,7 +64,15 @@
         <statusBarWidgetFactory id="GitOpsStudio.PullRequest" order="after gitWidget"
                                 implementation="io.github.purgator.gitops.ui.statusbar.PullRequestWidgetFactory"/>
 
+        <statusBarWidgetFactory id="GitOpsStudio.AheadBehind" order="after gitWidget"
+                                implementation="io.github.purgator.gitops.git.AheadBehindWidgetFactory"/>
+
         <postStartupActivity implementation="io.github.purgator.gitops.ui.setup.SetupNudge"/>
+        <postStartupActivity implementation="io.github.purgator.gitops.git.GitModuleStartup"/>
+
+        <editor.linePainter implementation="io.github.purgator.gitops.git.InlineBlamePainter"/>
+        <completion.contributor language="TEXT" order="first"
+                                implementationClass="io.github.purgator.gitops.git.GitmojiCompletionContributor"/>
 
         <applicationConfigurable parentId="tools" id="gitops.studio" displayName="GitOps Studio"
                                  instance="io.github.purgator.gitops.ui.settings.GitOpsConfigurable"/>
@@ -111,6 +120,12 @@
                 text="Gitmoji" description="Start the commit message with a gitmoji" icon="/icons/gitmoji.svg">
             <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
         </action>
+        <action id="GitOpsStudio.ToggleInlineBlame" class="io.github.purgator.gitops.git.ToggleInlineBlameAction"
+                text="Inline Blame" description="Show who last changed the current line at the end of that line"/>
+        <action id="GitOpsStudio.ShowLineCommit" class="io.github.purgator.gitops.git.ShowLineCommitAction"
+                text="Show Commit of Current Line" description="Open in the Git log the commit that last changed the current line">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
 
         <group id="GitOpsStudio.MainGroup" text="GitOps Studio" popup="true" icon="/icons/toolWindow.svg">
             <reference ref="GitOpsStudio.CreatePullRequest"/>
@@ -121,6 +136,7 @@
             <reference ref="GitOpsStudio.Clone"/>
             <reference ref="GitOpsStudio.Sync"/>
             <reference ref="GitOpsStudio.CleanUpBranches"/>
+            <reference ref="GitOpsStudio.ToggleInlineBlame"/>
             <separator/>
             <reference ref="GitOpsStudio.SetupWizard"/>
             <reference ref="GitOpsStudio.Settings"/>
@@ -132,6 +148,8 @@
             <reference ref="GitOpsStudio.CreatePullRequest"/>
             <reference ref="GitOpsStudio.Sync"/>
             <reference ref="GitOpsStudio.CleanUpBranches"/>
+            <reference ref="GitOpsStudio.ToggleInlineBlame"/>
+            <reference ref="GitOpsStudio.ShowLineCommit"/>
             <add-to-group group-id="Git.MainMenu" anchor="last"/>
         </group>
 

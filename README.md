@@ -15,7 +15,8 @@ Drive your cloud repositories without leaving the IDE. GitOps Studio is a plugin
 - 📍 **Always in sight** — the status bar shows the pull request of the current branch (or offers to create one); *Open on …* and *Copy link* work on any file and line selection.
 - 🧩 **Modular** — every host is a module with its own settings page and an on/off switch. A module that is off is never loaded.
 - 🧭 **Guided setup** — the wizard detects the host of your project, pre-fills the server and signs in with the vendor CLI (`gh`, `az`, `glab`), the credentials git already uses, or a personal access token. Each sign-in is verified before it is saved.
-- 🪄 **Git helpers** — a gitmoji picker in the commit message, a clean-up of merged and orphaned local branches, and a one-click sync that fast-forwards the default branch without leaving yours.
+- 🔎 **Inline blame** — the line under the caret shows who last changed it, when and in which commit; one action opens that commit in the Git log. The status bar shows the commits you have to push and to pull.
+- 🪄 **Git helpers** — gitmojis in the commit message, from a picker or suggested as you type `feature`, `fix`, `docs`…, a clean-up of merged and orphaned local branches, a one-click sync that fast-forwards the default branch without leaving yours, and an optional automatic fetch.
 - 🪶 **Lightweight** — under 1 MB, no bundled libraries, no background polling when the tool window is hidden, no telemetry.
 
 ### What each module supports
@@ -71,7 +72,9 @@ To update, install the new zip the same way. To remove the plugin, open **Settin
 | See why a build failed | Tool window → *Pipelines* → select a run → double-click a job to open its log |
 | Start working on a work item | Tool window → *Work Items* → *Start Working: Create Branch…* |
 | Share a link to some code | Right-click in the editor → *Copy … Link* |
-| Add a gitmoji to a commit | The smiley button of the commit message toolbar |
+| Add a gitmoji to a commit | Start the message with a word such as `feature`, `fix` or `sparkles` and pick the suggestion, or use the smiley button of the commit message toolbar |
+| See who last changed a line | Put the caret on it; right-click → *Show Commit of Current Line* for the full commit. **Git → Inline Blame** turns it on or off |
+| See what I have to push or pull | `↑2 ↓1` in the status bar; click it to fetch |
 | Delete stale local branches | **Git → Clean Up Branches…** |
 | Turn a module on or off | **Settings → Tools → GitOps Studio → (module)** → the switch at the top |
 
@@ -111,7 +114,7 @@ io.github.purgator.gitops
 │   ├── settings     Application settings, per-provider preferences
 │   └── RepoContext  git remotes of the project → RepoTarget (repository + provider + account)
 ├── providers        github, azure, gitlab, bitbucket, gitea: one provider + one client each
-├── git              The local Git module: gitmoji, branch clean-up, sync
+├── git              The local Git module: inline blame, ahead / behind, gitmoji, branch clean-up, sync
 └── ui               Tool window, pull request flow, pipelines, issues, settings, setup wizard
 ```
 
@@ -136,6 +139,7 @@ A few decisions worth knowing before changing things:
 
 - `providers/*Test` — remote URL parsing, request shapes and JSON mapping of each host, on a scripted transport.
 - `CoreTest` — URL parsing, the API client (errors, credential refresh), small helpers.
+- `GitFeaturesTest` — gitmoji suggestions, the blame parser (also against the installed git) and the ahead / behind counts.
 - `PluginWiringTest` — boots the IDE headless with the plugin and checks that every module, action, settings page and extension declared in `plugin.xml` loads.
 - `UiSmokeTest` — builds every dialog and panel for every provider; layout mistakes only fail at creation time.
 - `LiveGitHubTest` — opt-in, read-only round trip against the real GitHub API using the `gh` login: `GITOPS_LIVE=owner/repo ./gradlew test --tests "*LiveGitHubTest*"`.
