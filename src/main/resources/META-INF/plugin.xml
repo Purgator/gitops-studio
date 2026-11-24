@@ -90,6 +90,10 @@
                                  instance="io.github.purgator.gitops.ui.settings.GiteaConfigurable"/>
     </extensions>
 
+    <projectListeners>
+        <listener class="io.github.purgator.gitops.ui.pr.ProposeAfterPush" topic="git4idea.push.GitPushListener"/>
+    </projectListeners>
+
     <actions>
         <action id="GitOpsStudio.CreatePullRequest" class="io.github.purgator.gitops.ui.actions.CreatePullRequestAction"
                 text="Create Pull Request…" description="Create a pull request for the current branch"
@@ -123,9 +127,7 @@
         <action id="GitOpsStudio.ToggleInlineBlame" class="io.github.purgator.gitops.git.ToggleInlineBlameAction"
                 text="Inline Blame" description="Show who last changed the current line at the end of that line"/>
         <action id="GitOpsStudio.ShowLineCommit" class="io.github.purgator.gitops.git.ShowLineCommitAction"
-                text="Show Commit of Current Line" description="Open in the Git log the commit that last changed the current line">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
+                text="Show Commit of Current Line" description="Open in the Git log the commit that last changed the current line"/>
 
         <group id="GitOpsStudio.MainGroup" text="GitOps Studio" popup="true" icon="/icons/toolWindow.svg">
             <reference ref="GitOpsStudio.CreatePullRequest"/>
@@ -153,9 +155,16 @@
             <add-to-group group-id="Git.MainMenu" anchor="last"/>
         </group>
 
-        <group id="GitOpsStudio.FileGroup">
+        <group id="GitOpsStudio.FileGroup" class="io.github.purgator.gitops.ui.actions.ContextMenuGroup"
+               text="GitOps Studio" popup="true" icon="/icons/toolWindow.svg">
             <reference ref="GitOpsStudio.OpenFile"/>
             <reference ref="GitOpsStudio.CopyFileLink"/>
+            <separator/>
+            <reference ref="GitOpsStudio.ShowLineCommit"/>
+            <reference ref="GitOpsStudio.ToggleInlineBlame"/>
+            <separator/>
+            <reference ref="GitOpsStudio.CreatePullRequest"/>
+            <reference ref="GitOpsStudio.OpenBranchPullRequest"/>
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
             <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>

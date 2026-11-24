@@ -4,7 +4,9 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.options.ShowSettingsUtil
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtilCore
@@ -17,9 +19,23 @@ import io.github.purgator.gitops.core.util.Notify
 import io.github.purgator.gitops.git.GitSupport
 import io.github.purgator.gitops.ui.GitOps
 import io.github.purgator.gitops.ui.copyToClipboard
-import io.github.purgator.gitops.ui.pr.CreatePullRequestDialog
+import io.github.purgator.gitops.ui.pr.CreatePullRequestPanel
 import io.github.purgator.gitops.ui.settings.GitOpsConfigurable
 import io.github.purgator.gitops.ui.setup.SetupWizard
+
+/** The "GitOps Studio" submenu of the editor, project view and editor tab context menus. */
+class ContextMenuGroup : DefaultActionGroup(), DumbAware {
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        e.presentation.isHideGroupIfEmpty = true
+        // The menu is about a file of a git repository; elsewhere it would only hold generic entries.
+        val project = e.project
+        val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
+        e.presentation.isVisible = project != null && file != null &&
+            GitRepositoryManager.getInstance(project).getRepositoryForFileQuick(file) != null
+    }
+}
 
 /** Actions are registered statically but stay invisible until a cloud module is switched on. */
 abstract class CloudAction : DumbAwareAction() {
@@ -41,7 +57,7 @@ class CreatePullRequestAction : DumbAwareAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-        CreatePullRequestDialog.open(project, file?.let { targetOf(project, it) })
+        CreatePullRequestPanel.open(project, file?.let { targetOf(project, it) })
     }
 }
 
@@ -81,12 +97,12 @@ class RefreshAction : CloudAction() {
 class OpenBranchPullRequestAction : CloudAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val repo = RepoContext.get(project).current() ?: return CreatePullRequestDialog.open(project)
+        val repo = RepoContext.get(project).current() ?: return CreatePullRequestPanel.open(project)
         val branch = repo.currentBranch ?: return
         io.github.purgator.gitops.core.util.runAsync(null, { repo.client().findOpenPullRequest(repo.ref, branch) }, onError = {
             Notify.error(project, "GitOps Studio", it.message.orEmpty())
         }) { pr ->
-            if (pr != null) BrowserUtil.browse(pr.webUrl) else CreatePullRequestDialog.open(project, repo)
+            if (pr != null) BrowserUtil.browse(pr.webUrl) else CreatePullRequestPanel.open(project, repo)
         }
     }
 }

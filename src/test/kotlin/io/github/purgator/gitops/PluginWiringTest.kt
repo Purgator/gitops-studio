@@ -2,6 +2,7 @@ package io.github.purgator.gitops
 
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.notification.NotificationGroupManager
+import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorLinePainter
@@ -70,6 +71,10 @@ class PluginWiringTest {
             "MainGroup", "GitMenuGroup", "FileGroup",
         )
         for (id in ids) assertNotNull(actions.getAction("GitOpsStudio.$id"), id)
+        // The context menus get one "GitOps Studio" submenu, not loose entries.
+        val menu = actions.getAction("GitOpsStudio.FileGroup") as ActionGroup
+        assertTrue(menu.isPopup)
+        assertEquals("GitOps Studio", menu.templatePresentation.text)
         assertTrue(StatusBarWidgetFactory.EP_NAME.extensionList.any { it.id == PullRequestWidget.ID })
         assertTrue(StatusBarWidgetFactory.EP_NAME.extensionList.any { it.id == AheadBehindWidget.ID })
         assertTrue(EditorLinePainter.EP_NAME.extensionList.any { it is InlineBlamePainter })

@@ -8,6 +8,7 @@ import io.github.purgator.gitops.core.http.str
 import io.github.purgator.gitops.core.model.CheckState
 import io.github.purgator.gitops.core.model.IssueFilter
 import io.github.purgator.gitops.core.model.MergeOptions
+import io.github.purgator.gitops.core.model.PipelineRun
 import io.github.purgator.gitops.core.model.MergeStatus
 import io.github.purgator.gitops.core.model.MergeStrategy
 import io.github.purgator.gitops.core.model.NewPullRequest
@@ -55,7 +56,8 @@ class AzureDevOpsProviderTest {
         assertEquals("web", ssh.name)
 
         val legacy = parse("https://acme.visualstudio.com/DefaultCollection/Proj/_git/web")!!
-        assertEquals("https://acme.visualstudio.com", legacy.serverUrl)
+        assertEquals("https://dev.azure.com/acme", legacy.serverUrl)
+        assertTrue(AzureDevOpsProvider.fileUrl(legacy, "main", "a.txt", null).startsWith("https://dev.azure.com/acme/Proj/_git/web?path="))
         assertEquals("Proj", legacy.project)
 
         val defaultRepo = parse("https://acme.visualstudio.com/_git/web")!!
@@ -209,6 +211,43 @@ class AzureDevOpsProviderTest {
         assertEquals("Compile", jobs[0].name)
         assertEquals("Build", jobs[0].stage)
         assertEquals("12", jobs[0].logRef)
+    }
+
+    @Test
+    fun `lists the stages of a run in order and reruns one`() {
+        val transport = FakeTransport()
+            .on(
+                "GET", "/timeline",
+                """{"records":[
+                    {"id":"d","type":"Stage","name":"Deploy","identifier":"deploy_prod","order":2,"state":"completed","result":"failed"},
+                    {"id":"b","type":"Stage","name":"Build","identifier":"build","order":1,"state":"completed","result":"succeeded"},
+                    {"id":"q","type":"Stage","name":"Smoke tests","identifier":"smoke","order":3,"state":"pending"},
+                    {"id":"j","parentId":"b","type":"Job","name":"Compile","state":"completed","result":"succeeded"}]}""",
+            )
+            .on("PATCH", "/stages/", "{}")
+        val client = client(transport)
+        val run = PipelineRun(id = "42", name = "CI #1", state = CheckState.FAILURE, branch = "main", webUrl = "https://example.com")
+
+        val stages = client.listStages(repo, run)
+        assertEquals(listOf("Build", "Deploy", "Smoke tests"), stages.map { it.name })
+        assertEquals(listOf(CheckState.SUCCESS, CheckState.FAILURE, CheckState.PENDING), stages.map { it.state })
+
+        client.rerunStage(repo, run, stages[1], failedJobsOnly = true)
+        val request = transport.last("PATCH", "/stages/")
+        assertTrue(request.url.contains("/_apis/build/builds/42/stages/deploy_prod?"), request.url)
+        val body = parseJson(request.body!!)
+        assertEquals("retry", body.str("state"))
+        assertEquals("false", body.str("forceRetryAllJobs"))
+
+        client.rerunStage(repo, run, stages[1], failedJobsOnly = false)
+        assertEquals("true", parseJson(transport.last("PATCH", "/stages/").body!!).str("forceRetryAllJobs"))
+    }
+
+    @Test
+    fun `a pipeline without stages reports none`() {
+        val transport = FakeTransport().on("GET", "/timeline", """{"records":[{"id":"s","type":"Stage","name":"__default"},{"id":"j","parentId":"s","type":"Job","name":"Build"}]}""")
+        val run = PipelineRun(id = "1", name = "CI", state = CheckState.SUCCESS, branch = "main", webUrl = "")
+        assertTrue(client(transport).listStages(repo, run).isEmpty())
     }
 
     @Test

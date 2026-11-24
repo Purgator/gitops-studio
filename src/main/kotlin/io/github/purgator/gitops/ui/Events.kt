@@ -17,6 +17,12 @@ interface GitOpsListener {
     /** Bring a pull request into view in the tool window. */
     fun showPullRequest(id: String) {}
 
+    /** Another repository of the project was picked: the tool window shows its tabs. */
+    fun targetChanged() {}
+
+    /** Show the pull request creation form (the draft in progress, if there is one). */
+    fun createPullRequest() {}
+
     companion object {
         @JvmField
         val TOPIC: Topic<GitOpsListener> = Topic.create("GitOps Studio events", GitOpsListener::class.java)

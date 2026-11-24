@@ -28,6 +28,7 @@ import io.github.purgator.gitops.ui.copyToClipboard
 import io.github.purgator.gitops.ui.simpleAction
 import io.github.purgator.gitops.ui.toolwindow.TargetPanel
 import java.awt.BorderLayout
+import java.awt.CardLayout
 import java.awt.event.MouseEvent
 import javax.swing.JList
 import javax.swing.JPanel
@@ -41,9 +42,15 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
     private val filter = ComboBox(PrFilter.entries.toTypedArray())
     private val search = SearchTextField(false)
     private val details = PullRequestDetailsPanel(project)
+    private val cards = CardLayout()
+    private val right = JPanel(cards)
+
+    /** The pull request being written. It stays here, as typed, while the list or another tab is looked at. */
+    private var draft: CreatePullRequestPanel? = null
     private var all: List<PullRequest> = emptyList()
     private var pendingSelection: String? = null
     private var requestId = 0
+    private var restoring = false
 
     init {
         Disposer.register(this, details)
@@ -56,7 +63,12 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
 
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.cellRenderer = Renderer()
-        list.addListSelectionListener { if (!it.valueIsAdjusting) details.show(list.selectedValue) }
+        list.addListSelectionListener {
+            if (it.valueIsAdjusting) return@addListSelectionListener
+            details.show(list.selectedValue)
+            // Only a selection made by the user leaves the form being written; a refresh must not.
+            if (list.selectedValue != null && !restoring) cards.show(right, DETAILS)
+        }
         object : DoubleClickListener() {
             override fun onDoubleClick(event: MouseEvent): Boolean {
                 list.selectedValue?.let { BrowserUtil.browse(it.webUrl) }
@@ -65,8 +77,8 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
         }.installOn(list)
 
         val actions = DefaultActionGroup(
-            simpleAction("New ${terms().pullRequest}…", AllIcons.General.Add, enabled = { target != null }) {
-                CreatePullRequestDialog.open(project, target)
+            simpleAction("New ${terms().pullRequest} (or back to the one being written)", AllIcons.General.Add, enabled = { target != null }) {
+                CreatePullRequestPanel.open(project, target)
             },
             simpleAction("Refresh", AllIcons.Actions.Refresh) { reload() },
             simpleAction("Open in Browser", AllIcons.General.Web, enabled = { list.selectedValue != null }) {
@@ -88,13 +100,16 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
             add(north, BorderLayout.NORTH)
             add(ScrollPaneFactory.createScrollPane(list, true), BorderLayout.CENTER)
         }
+        right.add(details, DETAILS)
         add(OnePixelSplitter(false, "GitOpsStudio.PullRequests.Splitter", 0.4f).apply {
             firstComponent = left
-            secondComponent = details
+            secondComponent = right
         }, BorderLayout.CENTER)
 
         project.messageBus.connect(this).subscribe(GitOpsListener.TOPIC, object : GitOpsListener {
             override fun refreshRequested() = reload(silent = true)
+
+            override fun createPullRequest() = showDraft()
 
             override fun showPullRequest(id: String) {
                 val known = all.firstOrNull { it.id == id }
@@ -102,6 +117,40 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
             }
         })
         reload()
+    }
+
+    /** Shows the creation form: the draft in progress, or a new one when there is none or nothing was typed in it. */
+    private fun showDraft() {
+        val repo = target ?: return
+        val current = draft
+        if (current == null || current.isPristine || !current.repo.sameAs(repo)) {
+            closeDraft()
+            val form = CreatePullRequestPanel(project, repo, onHide = { cards.show(right, DETAILS) }) { created ->
+                closeDraft()
+                if (created != null) {
+                    pendingSelection = created.id
+                    reload(silent = true)
+                }
+            }
+            draft = form
+            right.add(form, DRAFT)
+        }
+        cards.show(right, DRAFT)
+        draft?.focusTitle()
+    }
+
+    private fun closeDraft() {
+        val form = draft ?: return
+        draft = null
+        cards.show(right, DETAILS)
+        right.remove(form)
+        Disposer.dispose(form)
+    }
+
+    override fun dispose() {
+        draft?.let { Disposer.dispose(it) }
+        draft = null
+        super.dispose()
     }
 
     private fun terms() = target?.provider?.terms ?: io.github.purgator.gitops.core.provider.Terminology()
@@ -146,14 +195,25 @@ class PullRequestsPanel(project: Project) : TargetPanel(project) {
         val visible = if (query.isEmpty()) all else all.filter { pr ->
             listOf(pr.title, pr.id, pr.author.label, pr.sourceBranch, pr.targetBranch).any { it.contains(query, ignoreCase = true) }
         }
-        model.replaceAll(visible)
-        val again = visible.firstOrNull { it.id == keepId }
-        if (again != null) list.setSelectedValue(again, true) else details.show(null)
+        restoring = true
+        try {
+            model.replaceAll(visible)
+            val again = visible.firstOrNull { it.id == keepId }
+            if (again != null) list.setSelectedValue(again, true) else details.show(null)
+        } finally {
+            restoring = false
+        }
     }
 
     private fun select(pr: PullRequest) {
         search.text = ""
         list.setSelectedValue(pr, true)
+        cards.show(right, DETAILS)
+    }
+
+    companion object {
+        private const val DETAILS = "details"
+        private const val DRAFT = "draft"
     }
 
     private class Renderer : ColoredListCellRenderer<PullRequest>() {

@@ -2,9 +2,28 @@
 
 ## Unreleased
 
+### Pull requests
+
+- **Creation moved into the tool window.** The form is no longer a dialog: start a pull request, hide it, look at something else and come back to it as you left it with the **+** button.
+- **Insert Commits** adds the subject of every commit of the branch to the description.
+- **Generate** writes the description with a command of your choice (`claude -p`, `ollama run …`, anything that reads a prompt on its standard input). The prompt is a setting, and the result can be appended, replace the description, or rewrite the current one (useful with a template). JetBrains AI Assistant cannot be called by other plugins, hence the command.
+- **Merge commit message**: the merge dialog shows the message and lets you edit it; a default template (`🔀 {title} (#{id})`, …) can be set in the settings and also applies to auto-complete.
+- After a **push**, a notification offers to create the pull request when the branch has none.
+
+### Pipelines
+
+- The right-hand list shows the **stages** of the selected run with their jobs beneath, and the list of runs shows one mark per stage (Azure DevOps).
+- **Rerun Stage** and **Rerun Failed Jobs of Stage** (Azure DevOps).
+- New filter **Main branch**, next to *Current branch* and *All branches*.
+
+### Interface
+
+- The entries of the editor, project view and tab context menus are grouped in one **GitOps Studio** submenu.
+- Fixed *Open on Azure DevOps* and *Copy Azure DevOps Link* for repositories cloned from the old `org.visualstudio.com` address: the links lacked the organisation.
+
 ### Git
 
-- **Inline blame**: the line under the caret shows who last changed it, when and in which commit. *Show Commit of Current Line* opens that commit in the Git log; **Git → Inline Blame** turns the annotation on or off.
+- **Inline blame**: the line under the caret shows who last changed it, when and in which commit. *Show Commit of Current Line* opens that commit in the Git log; **Git → Inline Blame** turns the annotation on or off. The text is a format of your own: `{author}`, `{subject}`, `{hash}`, `{ago}`, `{date}` or `{date:dd/MM/yyyy HH:mm}`.
 - The **status bar** shows the commits the current branch has to push and to pull (`↑2 ↓1`); click it to fetch.
 - **Automatic fetch** at an interval of your choice. Off by default.
 - **Gitmoji suggestions**: type `feature`, `fix`, `docs`, `refactor`… or the name of a gitmoji (`sparkles`) as the first word of a commit message and pick the gitmoji from the completion list. The picker also finds gitmojis by these words.

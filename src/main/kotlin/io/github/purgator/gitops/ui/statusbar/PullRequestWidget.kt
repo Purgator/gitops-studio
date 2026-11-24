@@ -27,7 +27,7 @@ import io.github.purgator.gitops.git.BranchRules
 import io.github.purgator.gitops.ui.GitOps
 import io.github.purgator.gitops.ui.GitOpsListener
 import io.github.purgator.gitops.ui.copyToClipboard
-import io.github.purgator.gitops.ui.pr.CreatePullRequestDialog
+import io.github.purgator.gitops.ui.pr.CreatePullRequestPanel
 import io.github.purgator.gitops.ui.simpleAction
 import java.awt.Component
 import java.awt.event.MouseEvent
@@ -121,7 +121,7 @@ class PullRequestWidget(private val project: Project) : StatusBarWidget, StatusB
     override fun getClickConsumer(): Consumer<MouseEvent> = Consumer { event ->
         val pr = pullRequest
         if (pr == null) {
-            if (text.isNotEmpty()) CreatePullRequestDialog.open(project)
+            if (text.isNotEmpty()) CreatePullRequestPanel.open(project)
             return@Consumer
         }
         val group = DefaultActionGroup(

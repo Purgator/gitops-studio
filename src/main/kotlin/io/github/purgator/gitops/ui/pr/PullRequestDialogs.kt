@@ -47,14 +47,15 @@ class MergeDialog(project: Project, private val repo: RepoTarget, pr: PullReques
     private val deleteBranch = JBCheckBox("Delete source branch after merging", settings.deleteSourceBranch && !pr.fromFork)
     private val autoComplete = JBCheckBox("Complete automatically when all checks and policies pass", pr.mergeStatus == io.github.purgator.gitops.core.model.MergeStatus.BLOCKED)
     private val completeWorkItems = JBCheckBox("Complete linked work items", settings.completeWorkItems)
-    private val message = JBTextField()
+    private val message = JBTextArea(PullRequestText.mergeMessage(GitOpsSettings.get().values.mergeMessageTemplate, pr).orEmpty(), 4, 40)
+        .apply { lineWrap = true; wrapStyleWord = true }
 
     init {
         title = "${repo.provider.terms.mergeVerb} #${pr.id}"
         setOKButtonText(repo.provider.terms.mergeVerb)
         strategy.selectedItem = settings.strategy
         deleteBranch.isEnabled = !pr.fromFork
-        message.emptyText.text = "Default message"
+        message.emptyText.text = "Leave empty for the default message of ${repo.provider.displayName}"
         init()
         // Only offer the strategies the repository allows; the default list stays if the lookup fails.
         runAsync(contentPanel, { repo.client().repoInfo(repo.ref).mergeStrategies }, isAlive = { !isDisposed }) { allowed ->
@@ -68,11 +69,14 @@ class MergeDialog(project: Project, private val repo: RepoTarget, pr: PullReques
 
     override fun createCenterPanel(): JComponent = panel {
         row("Strategy:") { cell(strategy).align(AlignX.FILL) }
-        row("Commit message:") { cell(message).align(AlignX.FILL) }
+        row("Commit message:") {
+            scrollCell(message).align(AlignX.FILL)
+                .comment("A default can be set in Settings | Tools | GitOps Studio.")
+        }
         row { cell(deleteBranch) }
         if (repo.provider.supports(Capability.TRANSITION_ISSUES)) row { cell(completeWorkItems) }
         if (repo.provider.supports(Capability.AUTO_COMPLETE)) row { cell(autoComplete) }
-    }.apply { preferredSize = Dimension(JBUI.scale(460), preferredSize.height) }
+    }.apply { preferredSize = Dimension(JBUI.scale(520), preferredSize.height) }
 
     fun options() = MergeOptions(
         strategy = strategy.selectedItem as? MergeStrategy ?: MergeStrategy.MERGE,

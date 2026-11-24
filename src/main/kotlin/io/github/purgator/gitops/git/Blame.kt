@@ -39,6 +39,8 @@ import java.awt.Color
 import java.awt.Font
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
 /** Who last changed a line: the commit, its author, its date and its subject. */
@@ -85,12 +87,28 @@ object Blame {
         return owners.map { it?.line }
     }
 
-    /** `Ann Lee, 3 days ago • Fix the login`. */
-    fun text(line: BlameLine, withSubject: Boolean, now: Instant = Instant.now()): String {
-        val who = listOf(line.author, line.time?.let { ago(it, now) }.orEmpty()).filter { it.isNotEmpty() }.joinToString(", ")
-        val subject = line.summary.let { if (it.length > MAX_SUBJECT) it.take(MAX_SUBJECT - 1).trimEnd() + "…" else it }
-        return if (withSubject && subject.isNotEmpty()) "$who • $subject" else who
-    }
+    private val PLACEHOLDER = Regex("\\{(\\w+)(?::([^}]*))?\\}")
+    private const val DEFAULT_DATE = "yyyy-MM-dd"
+
+    /**
+     * Fills [format] for [line]. `{author}`, `{subject}`, `{hash}` (short), `{ago}` (3 days ago),
+     * `{date}` (2026-11-25) and `{date:dd/MM/yyyy HH:mm}` with any date pattern. Unknown placeholders stay as typed.
+     */
+    fun text(line: BlameLine, format: String, now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): String =
+        PLACEHOLDER.replace(format) { match ->
+            when (match.groupValues[1]) {
+                "author" -> line.author
+                "subject" -> line.summary.let { if (it.length > MAX_SUBJECT) it.take(MAX_SUBJECT - 1).trimEnd() + "…" else it }
+                "hash" -> line.hash.take(8)
+                "ago" -> line.time?.let { ago(it, now) }.orEmpty()
+                "date" -> line.time?.let { time ->
+                    val pattern = match.groupValues[2].ifBlank { DEFAULT_DATE }
+                    val formatter = runCatching { DateTimeFormatter.ofPattern(pattern) }.getOrElse { DateTimeFormatter.ofPattern(DEFAULT_DATE) }
+                    runCatching { formatter.format(time.atZone(zone)) }.getOrDefault("")
+                }.orEmpty()
+                else -> match.value
+            }
+        }.trim()
 
     fun ago(time: Instant, now: Instant = Instant.now()): String {
         val elapsed = Duration.between(time, now)
@@ -210,7 +228,7 @@ class InlineBlamePainter : EditorLinePainter(), DumbAware {
         val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return null
         if (editor.caretModel.logicalPosition.line != lineNumber || editor.virtualFile != file) return null
         val info = BlameService.get(project).lineInfo(file, lineNumber) ?: return null
-        return listOf(LineExtensionInfo("      " + Blame.text(info, GitOpsSettings.get().values.inlineBlameSubject), attributes))
+        return listOf(LineExtensionInfo("      " + Blame.text(info, GitOpsSettings.get().values.inlineBlameFormat), attributes))
     }
 }
 

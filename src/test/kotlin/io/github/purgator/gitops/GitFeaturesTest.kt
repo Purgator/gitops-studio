@@ -16,6 +16,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 
 class GitmojiSuggestionTest {
@@ -126,10 +127,26 @@ class BlameTest {
     fun `formats the annotation`() {
         val now = Instant.ofEpochSecond(1700000000)
         val line = BlameLine("abc", "Ann Lee", now.minus(Duration.ofDays(3)), "Fix the login")
-        assertEquals("Ann Lee, 3 days ago • Fix the login", Blame.text(line, withSubject = true, now = now))
-        assertEquals("Ann Lee, 3 days ago", Blame.text(line, withSubject = false, now = now))
+        assertEquals("Ann Lee, 3 days ago • Fix the login", Blame.text(line, GitOpsSettings.DEFAULT_BLAME_FORMAT, now))
+        assertEquals("Ann Lee, 3 days ago", Blame.text(line, "{author}, {ago}", now))
         val long = BlameLine("abc", "Ann", null, "x".repeat(200))
-        assertEquals("Ann • " + "x".repeat(79) + "…", Blame.text(long, withSubject = true, now = now))
+        assertEquals("Ann •  " + "x".repeat(79) + "…", Blame.text(long, "{author} • {ago} {subject}", now))
+    }
+
+    @Test
+    fun `shows the exact date, in the pattern asked for`() {
+        // 2023-11-14T22:13:20Z
+        val line = BlameLine("0123456789abcdef", "Ann Lee", Instant.ofEpochSecond(1700000000), "Fix the login")
+        val utc = ZoneOffset.UTC
+        val now = Instant.ofEpochSecond(1700500000)
+        assertEquals("Ann Lee on 2023-11-14", Blame.text(line, "{author} on {date}", now, utc))
+        assertEquals("14/11/2023 22:13 Ann Lee", Blame.text(line, "{date:dd/MM/yyyy HH:mm} {author}", now, utc))
+        assertEquals("15/11/2023", Blame.text(line, "{date:dd/MM/yyyy}", now, ZoneOffset.ofHours(2)))
+        assertEquals("01234567 Fix the login", Blame.text(line, "{hash} {subject}", now, utc))
+        // A pattern that is not one falls back to the plain date; unknown placeholders are left alone.
+        assertEquals("2023-11-14", Blame.text(line, "{date:nope}", now, utc))
+        assertEquals("{who} Ann Lee", Blame.text(line, "{who} {author}", now, utc))
+        assertEquals("Ann", Blame.text(BlameLine("abc", "Ann", null, ""), "{author} {date}", now, utc))
     }
 
     @Test

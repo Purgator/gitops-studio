@@ -26,7 +26,9 @@ import com.intellij.util.ui.JBUI
 import io.github.purgator.gitops.core.RepoTarget
 import io.github.purgator.gitops.core.model.PipelineDefinition
 import io.github.purgator.gitops.core.model.PipelineJob
+import io.github.purgator.gitops.core.model.CheckState
 import io.github.purgator.gitops.core.model.PipelineRun
+import io.github.purgator.gitops.core.model.PipelineStage
 import io.github.purgator.gitops.core.provider.Capability
 import io.github.purgator.gitops.core.util.runAsync
 import io.github.purgator.gitops.core.util.runWithProgress
@@ -35,6 +37,7 @@ import io.github.purgator.gitops.git.GitSupport
 import io.github.purgator.gitops.ui.Format
 import io.github.purgator.gitops.ui.GitOpsIcons
 import io.github.purgator.gitops.ui.GitOpsListener
+import io.github.purgator.gitops.ui.Html
 import io.github.purgator.gitops.ui.copyToClipboard
 import io.github.purgator.gitops.ui.simpleAction
 import io.github.purgator.gitops.ui.toolwindow.TargetPanel
@@ -51,10 +54,13 @@ import javax.swing.ListSelectionModel
 class PipelinesPanel(project: Project) : TargetPanel(project) {
     private val runs = CollectionListModel<PipelineRun>()
     private val runList = JBList(runs)
-    private val jobs = CollectionListModel<PipelineJob>()
+    private val jobs = CollectionListModel<Any>()
     private val jobList = JBList(jobs)
-    private val scope = ComboBox(arrayOf(CURRENT_BRANCH, ALL_BRANCHES))
-    private val jobsTitle = JBLabel("Jobs").apply { border = JBUI.Borders.empty(6, 8) }
+    private val scope = ComboBox(arrayOf(CURRENT_BRANCH, MAIN_BRANCH, ALL_BRANCHES))
+    private val jobsTitle = JBLabel("Stages and jobs")
+
+    /** Stages of the most recent runs, shown as a row of marks in the list. */
+    private val stagesByRun = HashMap<String, List<PipelineStage>>().apply { border = JBUI.Borders.empty(6, 8) }
     private var runRequest = 0
     private var jobRequest = 0
 
@@ -64,7 +70,7 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
         runList.addListSelectionListener { if (!it.valueIsAdjusting) loadJobs() }
         jobList.selectionMode = ListSelectionModel.SINGLE_SELECTION
         jobList.cellRenderer = JobRenderer()
-        jobList.emptyText.text = "Select a run to see its jobs"
+        jobList.emptyText.text = "Select a run to see its stages and jobs"
         scope.addActionListener { reload() }
 
         object : DoubleClickListener() {
@@ -99,10 +105,17 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
             simpleAction("Copy Link", AllIcons.Actions.Copy, enabled = { selected() != null }) { selected()?.let { copyToClipboard(it.webUrl) } },
         )
         PopupHandler.installPopupMenu(runList, actions, "GitOpsStudio.Pipelines.Popup")
+        val job = { jobList.selectedValue as? PipelineJob }
+        val stage = { (jobList.selectedValue as? PipelineStage)?.takeIf { it.state.finished && can(Capability.STAGES) } }
         val jobActions = DefaultActionGroup(
-            simpleAction("Open Log", AllIcons.Debugger.Console, enabled = { jobList.selectedValue != null && can(Capability.JOB_LOGS) }) { openLog() },
-            simpleAction("Open in Browser", AllIcons.General.Web, enabled = { jobList.selectedValue?.webUrl != null }) {
-                jobList.selectedValue?.webUrl?.let { BrowserUtil.browse(it) }
+            simpleAction("Open Log", AllIcons.Debugger.Console, enabled = { job() != null && can(Capability.JOB_LOGS) }) { openLog() },
+            simpleAction("Open in Browser", AllIcons.General.Web, enabled = { job()?.webUrl != null }) {
+                job()?.webUrl?.let { BrowserUtil.browse(it) }
+            },
+            Separator.getInstance(),
+            simpleAction("Rerun Stage", AllIcons.Actions.Restart, enabled = { stage() != null }) { rerunStage(failedJobsOnly = false) },
+            simpleAction("Rerun Failed Jobs of Stage", AllIcons.RunConfigurations.RerunFailedTests, enabled = { stage()?.state == CheckState.FAILURE }) {
+                rerunStage(failedJobsOnly = true)
             },
         )
         PopupHandler.installPopupMenu(jobList, jobActions, "GitOpsStudio.Jobs.Popup")
@@ -144,12 +157,21 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
             runs.removeAll()
             return
         }
-        val branch = if (scope.selectedItem == CURRENT_BRANCH) repo.currentBranch else null
+        val choice = scope.selectedItem
+        val current = repo.currentBranch
         val keep = runList.selectedValue?.id
         runList.setPaintBusy(true)
         if (!silent) runList.emptyText.text = "Loading…"
         remote(
-            work = { r, client -> client.listPipelineRuns(r.ref, branch) },
+            work = { r, client ->
+                val branch = when (choice) {
+                    CURRENT_BRANCH -> current
+                    // The server knows which branch is the main one: main, master or anything else.
+                    MAIN_BRANCH -> client.repoInfo(r.ref).defaultBranch
+                    else -> null
+                }
+                branch to client.listPipelineRuns(r.ref, branch)
+            },
             onError = { error ->
                 if (request != runRequest) return@remote
                 runList.setPaintBusy(false)
@@ -158,12 +180,30 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
                     runList.emptyText.text = error.userMessage()
                 }
             },
-        ) { result ->
+        ) { (branch, result) ->
             if (request != runRequest) return@remote
             runList.setPaintBusy(false)
             runList.emptyText.text = if (branch != null) "No run for branch $branch" else "No run yet"
             runs.replaceAll(result)
             result.firstOrNull { it.id == keep }?.let { runList.setSelectedValue(it, false) }
+            loadStageMarks(result, request)
+        }
+    }
+
+    /** Fetches the stages of the latest runs so the list shows where each one stands, as the web page does. */
+    private fun loadStageMarks(result: List<PipelineRun>, request: Int) {
+        if (!can(Capability.STAGES)) return
+        stagesByRun.keys.retainAll(result.map { it.id }.toSet())
+        // Stages of a finished run only change when one is run again, which reloads the list anyway.
+        val wanted = result.take(STAGE_MARKS).filter { !it.state.finished || it.id !in stagesByRun }
+        if (wanted.isEmpty()) return
+        remote(
+            work = { r, client -> wanted.associate { run -> run.id to runCatching { client.listStages(r.ref, run) }.getOrDefault(emptyList()) } },
+            onError = {},
+        ) { found ->
+            if (request != runRequest) return@remote
+            stagesByRun.putAll(found)
+            runList.repaint()
         }
     }
 
@@ -172,15 +212,18 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
         val request = ++jobRequest
         jobs.removeAll()
         if (run == null) {
-            jobsTitle.text = "Jobs"
-            jobList.emptyText.text = "Select a run to see its jobs"
+            jobsTitle.text = "Stages and jobs"
+            jobList.emptyText.text = "Select a run to see its stages and jobs"
             return
         }
-        jobsTitle.text = "Jobs of ${run.name}"
+        jobsTitle.text = "Stages and jobs of ${run.name}"
         jobList.emptyText.text = "Loading…"
         jobList.setPaintBusy(true)
         remote(
-            work = { repo, client -> client.listJobs(repo.ref, run) },
+            work = { repo, client ->
+                val stages = if (repo.provider.supports(Capability.STAGES)) runCatching { client.listStages(repo.ref, run) }.getOrDefault(emptyList()) else emptyList()
+                StageRows.build(stages, client.listJobs(repo.ref, run))
+            },
             onError = { error ->
                 if (request == jobRequest) { jobList.setPaintBusy(false); jobList.emptyText.text = error.userMessage() }
             },
@@ -195,7 +238,7 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
     /** Downloads the job log and opens it as a read-only editor tab, where search and folding work. */
     private fun openLog() {
         val run = runList.selectedValue ?: return
-        val job = jobList.selectedValue ?: return
+        val job = jobList.selectedValue as? PipelineJob ?: return
         val repo = target ?: return
         if (!can(Capability.JOB_LOGS)) {
             job.webUrl?.let { BrowserUtil.browse(it) }
@@ -209,6 +252,15 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
         }
     }
 
+    private fun rerunStage(failedJobsOnly: Boolean) {
+        val run = runList.selectedValue ?: return
+        val stage = jobList.selectedValue as? PipelineStage ?: return
+        stagesByRun.remove(run.id)
+        mutate(if (failedJobsOnly) "Failed jobs of ${stage.name} restarted" else "Stage ${stage.name} restarted") { repo, client ->
+            client.rerunStage(repo.ref, run, stage, failedJobsOnly)
+        }
+    }
+
     private fun runPipeline() {
         val repo = target ?: return
         val dialog = RunPipelineDialog(project, repo)
@@ -218,7 +270,7 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
         mutate("${definition.name} started on $branch") { r, client -> client.runPipeline(r.ref, definition, branch) }
     }
 
-    private class RunRenderer : ColoredListCellRenderer<PipelineRun>() {
+    private inner class RunRenderer : ColoredListCellRenderer<PipelineRun>() {
         override fun customizeCellRenderer(list: JList<out PipelineRun>, value: PipelineRun?, index: Int, selected: Boolean, hasFocus: Boolean) {
             value ?: return
             icon = GitOpsIcons.of(value.state)
@@ -233,24 +285,63 @@ class PipelinesPanel(project: Project) : TargetPanel(project) {
                 if (value.state.finished) Format.duration(value.startedAt, value.finishedAt) else "",
             ).filter { it.isNotBlank() }.joinToString(" · ")
             append("   $details", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            val stages = stagesByRun[value.id].orEmpty()
+            if (stages.isNotEmpty()) {
+                append("   ")
+                // One mark per stage, in order, coloured by its state.
+                stages.forEach { append(Html.symbol(it.state) + " ", SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, Html.color(it.state))) }
+                toolTipText = stages.joinToString("  →  ") { "${it.name}: ${it.state.label.lowercase()}" }
+            } else {
+                toolTipText = null
+            }
         }
     }
 
-    private class JobRenderer : ColoredListCellRenderer<PipelineJob>() {
-        override fun customizeCellRenderer(list: JList<out PipelineJob>, value: PipelineJob?, index: Int, selected: Boolean, hasFocus: Boolean) {
-            value ?: return
-            icon = GitOpsIcons.of(value.state)
-            ipad = JBUI.insets(3, 6)
-            if (value.stage.isNotBlank()) append("${value.stage} / ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-            append(value.name)
-            val details = listOf(value.state.label, Format.duration(value.startedAt, value.finishedAt)).filter { it.isNotBlank() }.joinToString(" · ")
-            append("   $details", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+    private class JobRenderer : ColoredListCellRenderer<Any>() {
+        override fun customizeCellRenderer(list: JList<out Any>, value: Any?, index: Int, selected: Boolean, hasFocus: Boolean) {
+            when (value) {
+                is PipelineStage -> {
+                    icon = GitOpsIcons.of(value.state)
+                    ipad = JBUI.insets(3, 6)
+                    append(value.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    append("   ${value.state.label}", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                }
+                is PipelineJob -> {
+                    icon = GitOpsIcons.of(value.state)
+                    // Jobs sit under their stage.
+                    ipad = JBUI.insets(3, if (value.stage.isNotBlank()) 24 else 6, 3, 6)
+                    append(value.name)
+                    val details = listOf(value.state.label, Format.duration(value.startedAt, value.finishedAt)).filter { it.isNotBlank() }.joinToString(" · ")
+                    append("   $details", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                }
+            }
         }
     }
 
     companion object {
         private const val CURRENT_BRANCH = "Current branch"
+        private const val MAIN_BRANCH = "Main branch"
         private const val ALL_BRANCHES = "All branches"
+        private const val STAGE_MARKS = 15
+    }
+}
+
+/** Lays the jobs of a run under their stages: a stage, its jobs, the next stage, … */
+object StageRows {
+    /**
+     * [stages] as reported by the service; when it reports none, they are deduced from the stage name
+     * each job carries. Jobs without a stage come last, on their own.
+     */
+    fun build(stages: List<PipelineStage>, jobs: List<PipelineJob>): List<Any> {
+        val known = stages.ifEmpty {
+            jobs.map { it.stage }.filter { it.isNotBlank() }.distinct().map { name ->
+                val states = jobs.filter { it.stage == name }.map { it.state }
+                PipelineStage(name, name, CheckState.summarize(states) ?: CheckState.UNKNOWN)
+            }
+        }
+        val names = known.map { it.name }.toSet()
+        return known.flatMap { stage -> listOf<Any>(stage) + jobs.filter { it.stage == stage.name } } +
+            jobs.filter { it.stage !in names }.map { if (it.stage.isBlank()) it else it.copy(stage = "") }
     }
 }
 

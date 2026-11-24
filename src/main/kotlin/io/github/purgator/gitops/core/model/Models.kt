@@ -183,6 +183,14 @@ data class PipelineRun(
     val finishedAt: Instant? = null,
 )
 
+/** A stage of a run: a group of jobs that succeeds, fails and can be run again as one. */
+data class PipelineStage(
+    /** Handle used to rerun the stage. */
+    val id: String,
+    val name: String,
+    val state: CheckState,
+)
+
 data class PipelineJob(
     val id: String,
     val name: String,

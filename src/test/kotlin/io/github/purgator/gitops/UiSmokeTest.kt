@@ -21,7 +21,7 @@ import io.github.purgator.gitops.ui.issues.IssuesPanel
 import io.github.purgator.gitops.ui.issues.NewIssueDialog
 import io.github.purgator.gitops.ui.pipelines.PipelinesPanel
 import io.github.purgator.gitops.ui.pipelines.RunPipelineDialog
-import io.github.purgator.gitops.ui.pr.CreatePullRequestDialog
+import io.github.purgator.gitops.ui.pr.CreatePullRequestPanel
 import io.github.purgator.gitops.ui.pr.EditPullRequestDialog
 import io.github.purgator.gitops.ui.pr.MergeDialog
 import io.github.purgator.gitops.ui.pr.PullRequestDetailsPanel
@@ -119,7 +119,7 @@ class UiSmokeTest {
     @Test
     fun `pull request dialogs build for every provider`() = onEdt {
         for (target in targets()) {
-            check(CreatePullRequestDialog(project, target))
+            check(CreatePullRequestPanel(project, target, onHide = {}, onDone = {}))
             check(MergeDialog(project, target, pullRequest))
             check(ReviewerChooserDialog(project, target, listOf(User("u2", "Bob"))))
             check(RunPipelineDialog(project, target))

@@ -12,6 +12,7 @@ import io.github.purgator.gitops.core.model.NewPullRequest
 import io.github.purgator.gitops.core.model.PipelineDefinition
 import io.github.purgator.gitops.core.model.PipelineJob
 import io.github.purgator.gitops.core.model.PipelineRun
+import io.github.purgator.gitops.core.model.PipelineStage
 import io.github.purgator.gitops.core.model.PrFilter
 import io.github.purgator.gitops.core.model.PullRequest
 import io.github.purgator.gitops.core.model.PullRequestUpdate
@@ -41,6 +42,9 @@ enum class Capability {
     RUN_PIPELINE,
     RERUN_PIPELINE,
     CANCEL_PIPELINE,
+
+    /** Runs are made of stages that the service reports and can run again one by one. */
+    STAGES,
     JOB_LOGS,
     ISSUES,
     CREATE_ISSUE,
@@ -177,6 +181,12 @@ interface HostingClient {
     fun rerunPipeline(repo: RepoRef, run: PipelineRun): Unit = unsupported()
     fun cancelPipeline(repo: RepoRef, run: PipelineRun): Unit = unsupported()
     fun listJobs(repo: RepoRef, run: PipelineRun): List<PipelineJob> = unsupported()
+
+    /** Stages of [run], in order. Empty when the service has no such notion or the run has a single implicit stage. */
+    fun listStages(repo: RepoRef, run: PipelineRun): List<PipelineStage> = emptyList()
+
+    /** Runs [stage] again: all of its jobs, or only those that failed. */
+    fun rerunStage(repo: RepoRef, run: PipelineRun, stage: PipelineStage, failedJobsOnly: Boolean): Unit = unsupported()
     fun jobLog(repo: RepoRef, run: PipelineRun, job: PipelineJob): String = unsupported()
 
     // Issues / work items

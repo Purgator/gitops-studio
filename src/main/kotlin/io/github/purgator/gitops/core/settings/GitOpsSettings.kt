@@ -52,6 +52,15 @@ class GitOpsSettings : PersistentStateComponent<GitOpsSettings.State> {
         var usePullRequestTemplate: Boolean = true
         var pushBeforeCreate: Boolean = true
         var pageSize: Int = 50
+        var proposePullRequestAfterPush: Boolean = true
+
+        /** Empty keeps the message of the hosting service. Placeholders: see [io.github.purgator.gitops.ui.pr.PullRequestText]. */
+        var mergeMessageTemplate: String = ""
+
+        // Description generator: a command that reads the prompt on its standard input and prints the text.
+        var aiCommand: String = ""
+        var aiPrompt: String = DEFAULT_AI_PROMPT
+        var aiMode: String = "REPLACE"
 
         // Git module
         var gitmojiEnabled: Boolean = true
@@ -60,7 +69,9 @@ class GitOpsSettings : PersistentStateComponent<GitOpsSettings.State> {
         var protectedBranches: String = "main, master, develop, release/*"
         var pruneOnSync: Boolean = false
         var inlineBlame: Boolean = true
-        var inlineBlameSubject: Boolean = true
+
+        /** Placeholders: {author} {ago} {date} {date:pattern} {subject} {hash}. */
+        var inlineBlameFormat: String = DEFAULT_BLAME_FORMAT
         var showAheadBehind: Boolean = true
 
         /** 0 turns automatic fetch off. */
@@ -88,6 +99,12 @@ class GitOpsSettings : PersistentStateComponent<GitOpsSettings.State> {
         get() = PrFilter.entries.firstOrNull { it.name == state.defaultPrFilter } ?: PrFilter.OPEN
 
     companion object {
+        const val DEFAULT_BLAME_FORMAT = "{author}, {ago} • {subject}"
+        const val DEFAULT_AI_PROMPT =
+            "Write the description of a pull request titled \"{title}\", merging {source} into {target}.\n" +
+                "Use Markdown: a one-paragraph summary, then a short list of the notable changes. " +
+                "Reply with the description only.\n\nCommits:\n{commits}\n\nChanged files:\n{files}"
+
         fun get(): GitOpsSettings = service()
     }
 }

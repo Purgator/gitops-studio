@@ -34,7 +34,7 @@ object AzureDevOpsProvider : HostingProvider {
     override val capabilities = setOf(
         Capability.DRAFT_PR, Capability.REVIEWERS, Capability.LABELS, Capability.LINK_ISSUES, Capability.TRANSITION_ISSUES, Capability.AUTO_COMPLETE,
         Capability.REOPEN_PR, Capability.VOTE_SUGGESTIONS, Capability.VOTE_WAIT, Capability.VOTE_REJECT, Capability.VOTE_RESET,
-        Capability.PIPELINES, Capability.RUN_PIPELINE, Capability.RERUN_PIPELINE, Capability.CANCEL_PIPELINE, Capability.JOB_LOGS,
+        Capability.PIPELINES, Capability.RUN_PIPELINE, Capability.RERUN_PIPELINE, Capability.CANCEL_PIPELINE, Capability.STAGES, Capability.JOB_LOGS,
         Capability.ISSUES, Capability.CREATE_ISSUE, Capability.ISSUE_TYPES, Capability.ISSUE_COMMENTS, Capability.REPOSITORIES,
     )
 
@@ -84,7 +84,8 @@ object AzureDevOpsProvider : HostingProvider {
                 val repo = seg[git + 1]
                 // `https://org.visualstudio.com/_git/repo` is the default repository of the project of the same name.
                 val project = seg.getOrNull(git - 1)?.takeUnless { it.equals("DefaultCollection", true) } ?: repo
-                RepoRef(id, "https://$host", org, repo, project)
+                // Web links use the current address: the old host no longer serves every page of an organisation.
+                RepoRef(id, "https://dev.azure.com/$org", org, repo, project)
             }
 
             // Azure DevOps Server / TFS: https://server[:port]/[tfs/]Collection/project/_git/repo

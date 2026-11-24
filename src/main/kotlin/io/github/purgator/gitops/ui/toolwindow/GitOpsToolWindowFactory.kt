@@ -28,6 +28,7 @@ import io.github.purgator.gitops.core.modules.ModuleListener
 import io.github.purgator.gitops.core.provider.Capability
 import io.github.purgator.gitops.core.settings.GitOpsSettings
 import io.github.purgator.gitops.ui.GitOps
+import io.github.purgator.gitops.ui.GitOpsListener
 import io.github.purgator.gitops.ui.issues.IssuesPanel
 import io.github.purgator.gitops.ui.pipelines.PipelinesPanel
 import io.github.purgator.gitops.ui.pr.PullRequestsPanel
@@ -61,6 +62,9 @@ private class ToolWindowController(private val project: Project, private val too
         val bus = project.messageBus.connect(this)
         bus.subscribe(VcsRepositoryManager.VCS_REPOSITORY_MAPPING_UPDATED, VcsRepositoryMappingListener { scheduleRebuild() })
         bus.subscribe(GitRepository.GIT_REPO_CHANGE, GitRepositoryChangeListener { scheduleRebuild() })
+        bus.subscribe(GitOpsListener.TOPIC, object : GitOpsListener {
+            override fun targetChanged() = rebuild()
+        })
 
         toolWindow.setTitleActions(
             listOf(

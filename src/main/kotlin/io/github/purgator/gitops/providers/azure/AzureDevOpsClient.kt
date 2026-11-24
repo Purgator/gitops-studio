@@ -28,6 +28,7 @@ import io.github.purgator.gitops.core.model.NewPullRequest
 import io.github.purgator.gitops.core.model.PipelineDefinition
 import io.github.purgator.gitops.core.model.PipelineJob
 import io.github.purgator.gitops.core.model.PipelineRun
+import io.github.purgator.gitops.core.model.PipelineStage
 import io.github.purgator.gitops.core.model.PrFilter
 import io.github.purgator.gitops.core.model.PrState
 import io.github.purgator.gitops.core.model.PullRequest
@@ -448,6 +449,26 @@ class AzureDevOpsClient(
                     finishedAt = job.instant("finishTime"),
                 )
             }
+    }
+
+    override fun listStages(repo: RepoRef, run: PipelineRun): List<PipelineStage> =
+        api.get("${project(repo)}/_apis/build/builds/${run.id}/timeline", version).list("records")
+            .filter { it.str("type") == "Stage" && it.str("name") != "__default" }
+            .sortedBy { it.int("order") ?: 0 }
+            .map { stage ->
+                PipelineStage(
+                    id = stage.str("identifier").ifBlank { stage.str("name") },
+                    name = stage.str("name"),
+                    state = timelineState(stage.str("state"), stage.str("result")),
+                )
+            }
+
+    override fun rerunStage(repo: RepoRef, run: PipelineRun, stage: PipelineStage, failedJobsOnly: Boolean) {
+        api.patch(
+            "${project(repo)}/_apis/build/builds/${run.id}/stages/${urlEncode(stage.id)}",
+            jsonOf("state" to "retry", "forceRetryAllJobs" to !failedJobsOnly),
+            "api-version" to "$API_VERSION-preview.1",
+        )
     }
 
     private fun timelineState(state: String, result: String): CheckState = when (state) {

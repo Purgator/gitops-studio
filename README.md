@@ -8,14 +8,14 @@ Drive your cloud repositories without leaving the IDE. GitOps Studio is a plugin
 
 ## Features
 
-- 🚀 **Create a pull request in seconds** — press `Ctrl+Alt+Shift+P`: the title and description are already filled from your commits (or from the repository's pull request template), the target is the default branch, and the branch is pushed for you. Add reviewers, labels, linked work items, mark it as a draft or set auto-complete, then press *Create*.
+- 🚀 **Create a pull request in seconds** — press `Ctrl+Alt+Shift+P`: the title and description are already filled from your commits (or from the repository's pull request template), the target is the default branch, and the branch is pushed for you. Add reviewers, labels, linked work items, mark it as a draft or set auto-complete, then press *Create*. The form lives in the tool window, so you can hide a half-written pull request and come back to it. *Insert Commits* lists the branch's commits in the description and *Generate* has a command-line AI tool of your choice write it. After a push, a notification offers to create the pull request if the branch has none.
 - 👀 **Review and complete** — every pull request shows its reviewers and votes, checks and branch policies, conversation and changed files (opened in the IDE's own diff). Approve, request changes, comment, reply, edit, publish a draft, merge with the strategy you want, abandon or reopen.
-- ⚙️ **Pipelines** — recent runs of the current branch or of all branches, their jobs, and the log of any job opened in an editor tab. Start a pipeline on a branch, rerun or cancel a run.
+- ⚙️ **Pipelines** — recent runs of the current branch or of all branches, their jobs, and the log of any job opened in an editor tab. Start a pipeline on a branch, rerun or cancel a run. The stages of a run are shown with their jobs, a filter shows the runs of the main branch, and on Azure DevOps a stage can be run again, entirely or only its failed jobs.
 - 📋 **Work items and issues** — search, filter, create, change state, comment, and *start working*: one click creates a branch named after the item.
 - 📍 **Always in sight** — the status bar shows the pull request of the current branch (or offers to create one); *Open on …* and *Copy link* work on any file and line selection.
 - 🧩 **Modular** — every host is a module with its own settings page and an on/off switch. A module that is off is never loaded.
 - 🧭 **Guided setup** — the wizard detects the host of your project, pre-fills the server and signs in with the vendor CLI (`gh`, `az`, `glab`), the credentials git already uses, or a personal access token. Each sign-in is verified before it is saved.
-- 🔎 **Inline blame** — the line under the caret shows who last changed it, when and in which commit; one action opens that commit in the Git log. The status bar shows the commits you have to push and to pull.
+- 🔎 **Inline blame** — the line under the caret shows who last changed it, when and in which commit; one action opens that commit in the Git log. The status bar shows the commits you have to push and to pull. The text is yours to format, with the exact date if you prefer it to "3 days ago".
 - 🪄 **Git helpers** — gitmojis in the commit message, from a picker or suggested as you type `feature`, `fix`, `docs`…, a clean-up of merged and orphaned local branches, a one-click sync that fast-forwards the default branch without leaving yours, and an optional automatic fetch.
 - 🪶 **Lightweight** — under 1 MB, no bundled libraries, no background polling when the tool window is hidden, no telemetry.
 
@@ -34,6 +34,7 @@ Drive your cloud repositories without leaving the IDE. GitOps Studio is a plugin
 | Conversation and replies | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Pipelines: list runs and jobs | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Pipelines: job logs | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Pipelines: stages, rerun a stage | — | ✅ | — | — | — |
 | Pipelines: run / rerun / cancel | ✅ / ✅ / ✅ | ✅ / ✅ / ✅ | ✅ / ✅ / ✅ | ✅ / — / ✅ | ✅ / — / — |
 | Issues / work items | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Clone from the account | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -67,13 +68,18 @@ To update, install the new zip the same way. To remove the plugin, open **Settin
 | I want to… | Do this |
 |---|---|
 | Create a pull request | `Ctrl+Alt+Shift+P`, or **Git → Create Pull Request…**, or the **+** button of the tool window |
+| Pause a pull request I am writing | *Hide* in the form; the **+** button brings it back as it was |
+| Have the description written for me | Set a command in **Settings → Tools → GitOps Studio → Description Generator** (for example `claude -p`), then *Generate* in the form |
+| Choose the merge commit message | Edit it in the merge dialog; set a default such as `🔀 {title} (#{id})` in **Settings → Tools → GitOps Studio** |
 | See the pull request of my branch | Click `PR #…` in the status bar |
 | Review, vote, merge | **GitOps Studio** tool window → *Pull Requests* → select one |
 | See why a build failed | Tool window → *Pipelines* → select a run → double-click a job to open its log |
+| Run a failed stage again | Tool window → *Pipelines* → select a run → right-click the stage → *Rerun Stage* or *Rerun Failed Jobs of Stage* |
 | Start working on a work item | Tool window → *Work Items* → *Start Working: Create Branch…* |
 | Share a link to some code | Right-click in the editor → *Copy … Link* |
 | Add a gitmoji to a commit | Start the message with a word such as `feature`, `fix` or `sparkles` and pick the suggestion, or use the smiley button of the commit message toolbar |
 | See who last changed a line | Put the caret on it; right-click → *Show Commit of Current Line* for the full commit. **Git → Inline Blame** turns it on or off |
+| Show the exact date in the blame | **Settings → Tools → GitOps Studio → Git → Format**, for example `{author}, {date:dd/MM/yyyy} • {subject}` |
 | See what I have to push or pull | `↑2 ↓1` in the status bar; click it to fetch |
 | Delete stale local branches | **Git → Clean Up Branches…** |
 | Turn a module on or off | **Settings → Tools → GitOps Studio → (module)** → the switch at the top |
@@ -150,7 +156,7 @@ Bump `pluginVersion` in `gradle.properties`, add the notes to `CHANGELOG.md`, ta
 
 ## Privacy
 
-GitOps Studio talks only to the servers of the accounts you connect, with the credentials you chose. It collects nothing and sends nothing anywhere else.
+GitOps Studio talks only to the servers of the accounts you connect, with the credentials you chose. It collects nothing and sends nothing anywhere else. The description generator is off until you set its command; when you press *Generate*, the title, branch names, commit messages, list of changed files and, if the prompt asks for it, the current description are passed to that command and to nothing else.
 
 ## License
 

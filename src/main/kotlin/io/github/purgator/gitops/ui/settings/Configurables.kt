@@ -20,6 +20,7 @@ import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.rows
 import com.intellij.ui.layout.ComponentPredicate
 import com.intellij.util.ui.JBUI
 import io.github.purgator.gitops.core.accounts.Account
@@ -33,6 +34,7 @@ import io.github.purgator.gitops.core.provider.HostingProvider
 import io.github.purgator.gitops.core.settings.GitOpsSettings
 import io.github.purgator.gitops.git.AutoFetchService
 import io.github.purgator.gitops.git.Blame
+import io.github.purgator.gitops.ui.pr.AiMode
 import io.github.purgator.gitops.ui.setup.SetupWizard
 import java.awt.Dimension
 import javax.swing.JList
@@ -71,11 +73,43 @@ class GitOpsConfigurable : BoundConfigurable("GitOps Studio"), SearchableConfigu
                 row { checkBox("Otherwise build the description from the branch's commits").bindSelected(state::useCommitsForDescription) }
                 row { checkBox("Open the pull request in the browser once created").bindSelected(state::openInBrowserAfterCreate) }
                 row { checkBox("Copy the pull request link once created").bindSelected(state::copyLinkAfterCreate) }
+                row {
+                    checkBox("After a push, offer to create a pull request when the branch has none").bindSelected(state::proposePullRequestAfterPush)
+                }
                 row("Default list filter:") {
                     comboBox(PrFilter.entries).bindItem(
                         { GitOpsSettings.get().prFilter },
                         { state.defaultPrFilter = (it ?: PrFilter.OPEN).name },
                     )
+                }
+                row("Merge commit message:") {
+                    textField().bindText(state::mergeMessageTemplate).align(AlignX.FILL)
+                        .comment(
+                            "Proposed when merging; it can still be edited then. Empty keeps the message of the hosting service.<br/>" +
+                                "Placeholders: {title} {id} {source} {target} {author} {description}, and \\n for a new line.<br/>" +
+                                "Example: 🔀 {title} (#{id})",
+                        )
+                }
+            }
+            group("Description Generator") {
+                row {
+                    comment(
+                        "The <i>Generate</i> button of a new pull request sends the prompt below to a command of your choice and " +
+                            "uses what it prints. JetBrains AI Assistant offers no way for other plugins to call it, so any tool " +
+                            "that reads a prompt on its standard input works instead.",
+                    )
+                }
+                row("Command:") {
+                    textField().bindText(state::aiCommand).align(AlignX.FILL)
+                        .comment("For example: claude -p &nbsp;·&nbsp; ollama run llama3 &nbsp;·&nbsp; llm. It runs in the repository folder. Empty turns the button into a reminder.")
+                }
+                row("Prompt:") {
+                    textArea().bindText(state::aiPrompt).rows(6).align(AlignX.FILL)
+                        .comment("Placeholders: {title} {source} {target} {commits} {files} {description}")
+                }
+                row("Result:") {
+                    comboBox(AiMode.entries).bindItem({ AiMode.of(state.aiMode) }, { state.aiMode = (it ?: AiMode.REPLACE).name })
+                        .comment("The default; the form lets you pick another one each time.")
                 }
             }
             group("Interface") {
@@ -238,7 +272,13 @@ class GitModuleConfigurable : ModuleConfigurable(ModuleRegistry.GIT) {
                 checkBox("Show who last changed the current line, at the end of the line").bindSelected(state::inlineBlame)
                     .comment("Ann Lee, 3 days ago • Fix the login")
             }
-            row { checkBox("Include the commit subject").bindSelected(state::inlineBlameSubject) }
+            row("Format:") {
+                textField().bindText(state::inlineBlameFormat).align(AlignX.FILL)
+                    .comment(
+                        "Placeholders: {author} {subject} {hash} {ago} (3 days ago) {date} (2026-11-25) and {date:dd/MM/yyyy HH:mm} with any date pattern.<br/>" +
+                            "Example: {author}, {date:dd/MM/yyyy} • {subject}",
+                    )
+            }
         }
         group("Commit Messages") {
             row {
