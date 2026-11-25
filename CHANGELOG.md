@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 ### Pull requests
 
@@ -19,6 +19,7 @@
 ### Interface
 
 - The entries of the editor, project view and tab context menus are grouped in one **GitOps Studio** submenu.
+- **Open In** submenu: a new entry named after the hosting service (for example *Azure DevOps*) opens the file on the server, with the organisation in the link.
 - Fixed *Open on Azure DevOps* and *Copy Azure DevOps Link* for repositories cloned from the old `org.visualstudio.com` address: the links lacked the organisation.
 
 ### Git
@@ -28,6 +29,7 @@
 - **Automatic fetch** at an interval of your choice. Off by default.
 - **Gitmoji suggestions**: type `feature`, `fix`, `docs`, `refactor`… or the name of a gitmoji (`sparkles`) as the first word of a commit message and pick the gitmoji from the completion list. The picker also finds gitmojis by these words.
 - Picking a gitmoji now leaves the caret right after it, ready to type the message.
+- Fixed the gitmoji suggestions not popping up while typing the first word of the commit message.
 - *Sync with Remote* no longer prunes remote branches unless you turn the option on.
 
 ## 0.1.0
