@@ -73,6 +73,9 @@
         <editor.linePainter implementation="io.github.purgator.gitops.git.InlineBlamePainter"/>
         <completion.contributor language="TEXT" order="first"
                                 implementationClass="io.github.purgator.gitops.git.GitmojiCompletionContributor"/>
+        <completion.confidence language="TEXT" order="first"
+                               implementationClass="io.github.purgator.gitops.git.GitmojiCompletionConfidence"/>
+        <typedHandler implementation="io.github.purgator.gitops.git.GitmojiTypedHandler"/>
 
         <applicationConfigurable parentId="tools" id="gitops.studio" displayName="GitOps Studio"
                                  instance="io.github.purgator.gitops.ui.settings.GitOpsConfigurable"/>
@@ -118,6 +121,10 @@
                 text="Settings…" icon="AllIcons.General.Settings"/>
         <action id="GitOpsStudio.OpenFile" class="io.github.purgator.gitops.ui.actions.OpenFileInCloudAction"
                 text="Open on Hosting Service" icon="AllIcons.General.Web"/>
+        <action id="GitOpsStudio.OpenFileInMenu" class="io.github.purgator.gitops.ui.actions.OpenFileInCloudMenuAction"
+                text="Hosting Service" icon="AllIcons.General.Web">
+            <add-to-group group-id="RevealGroup" anchor="last"/>
+        </action>
         <action id="GitOpsStudio.CopyFileLink" class="io.github.purgator.gitops.ui.actions.CopyFileCloudLinkAction"
                 text="Copy Hosting Service Link" icon="AllIcons.Actions.Copy"/>
         <action id="GitOpsStudio.Gitmoji" class="io.github.purgator.gitops.git.GitmojiAction"

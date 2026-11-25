@@ -148,7 +148,13 @@ class OpenFileInCloudAction : FileLinkAction() {
     override fun handle(project: Project, url: String) = BrowserUtil.browse(url)
 }
 
-class CopyFileCloudLinkAction : FileLinkAction() {
+/** Same as [OpenFileInCloudAction], labelled with the host alone for the IDE's "Open In" submenu. */
+class OpenFileInCloudMenuAction : FileLinkAction() {
+    override fun text(host: String) = host
+    override fun handle(project: Project, url: String) = BrowserUtil.browse(url)
+}
+
+class CopyFileCloudLinkAction: FileLinkAction() {
     override fun text(host: String) = "Copy $host Link"
     override fun handle(project: Project, url: String) {
         copyToClipboard(url)

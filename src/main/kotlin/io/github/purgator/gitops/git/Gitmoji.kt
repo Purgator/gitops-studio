@@ -1,5 +1,12 @@
 package io.github.purgator.gitops.git
 
+import com.intellij.codeInsight.AutoPopupController
+import com.intellij.codeInsight.completion.CompletionConfidence
+import com.intellij.codeInsight.editorActions.TypedHandlerDelegate
+import com.intellij.openapi.editor.Editor
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.util.ThreeState
 import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionResultSet
@@ -189,6 +196,33 @@ class GitmojiAction : DumbAwareAction() {
             .setItemChosenCallback { chosen -> Gitmojis.insert(project, document, chosen, asCode) }
             .createPopup()
             .showInBestPositionFor(e.dataContext)
+    }
+}
+
+/**
+ * Plain text editors, such as the commit message, do not open the completion popup by themselves while
+ * typing. Open it as soon as a character lands in the first word of the commit message.
+ */
+class GitmojiTypedHandler : TypedHandlerDelegate() {
+    override fun checkAutoPopup(charTyped: Char, project: Project, editor: Editor, file: PsiFile): Result {
+        val document = editor.document
+        if (!(charTyped.isLetterOrDigit() || charTyped == ':' || charTyped == '_')) return Result.CONTINUE
+        if (!CommitMessage.isCommitMessage(document)) return Result.CONTINUE
+        val settings = GitOpsSettings.get().values
+        if (!settings.gitmojiCompletion || !ModuleRegistry.get().isEnabled(ModuleRegistry.GIT)) return Result.CONTINUE
+        // The typed character is not in the document yet: only the text before the caret matters.
+        val before = document.charsSequence.subSequence(0, editor.caretModel.offset)
+        if (Gitmojis.firstWord(before, before.length) == null) return Result.CONTINUE
+        AutoPopupController.getInstance(project).scheduleAutoPopup(editor)
+        return Result.STOP
+    }
+}
+
+/** Never skip the auto-popup in the commit message: plain text normally does. */
+class GitmojiCompletionConfidence : CompletionConfidence() {
+    override fun shouldSkipAutopopup(contextElement: PsiElement, psiFile: PsiFile, offset: Int): ThreeState {
+        val document = psiFile.viewProvider.document ?: return ThreeState.UNSURE
+        return if (CommitMessage.isCommitMessage(document)) ThreeState.NO else ThreeState.UNSURE
     }
 }
 
